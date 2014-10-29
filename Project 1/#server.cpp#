@@ -87,7 +87,6 @@ void Server::freeChild(pid_t pid) {
 void Server::listen() {
 	socket.create();
 	socket.bind(portNumber);
-	bool duplicate = false;
 
 	// Check the port
 	int socketPort = socket.portNumber();
@@ -122,20 +121,29 @@ void Server::listen() {
 		
 		// Fork until success
 		do {
+			//cout << "PID = " << pid << endl;
 			pid = fork();
+			//cout << "pid1 = " << pid << endl;s
 			if(pid > 0) {
+				//cout << "PID1 = " << pid << endl;
 				childForks.insert(pid);
 				waitpid(0, NULL, 0);
+				
+				//cout << "wait" <<endl;
 				break;
 			} else {
 				// Don't need the set for the child
 				childForks.clear();
+				// Handle the data, then exit when done
+				//cout << "PID2 = " << pid << endl;
 				string data;
 				newSocket.receive(data); 
 				handleRequest(newSocket,data);
 				
+				//cout << "KILL!" << endl;
 				exit(0);
 			}
+			cout << "finished" <<endl;
 		} while(pid == 0);
 	}	
 }
@@ -211,7 +219,6 @@ void Server::handleRequest(Socket& responseSocket, const string& request) {
 	end = file.tellg();
 	file.close();
 	int size = end - begin;
-	
 	string content( (istreambuf_iterator<char>(ifs)), 
 			(istreambuf_iterator<char>()  ));	
 	//////
@@ -248,17 +255,15 @@ void Server::handleRequest(Socket& responseSocket, const string& request) {
 	if (responseCode != HTTP_NOT_FOUND)
 		header << "Content-Type: " << mimeType << endl << endl;;
 	
+	header << content;
 	
-	const char* ct = content.c_str();
-	
-	
-	
+
+	const char* ct = header.str().c_str();	
+	cout  << ct ;
 	
 	responseSocket.send(ct);
 
 	cout << endl << "Client Request:" << endl << request << endl;
-
-	cout  << header.str();
 	
 }
 
