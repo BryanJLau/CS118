@@ -87,6 +87,7 @@ void Server::freeChild(pid_t pid) {
 void Server::listen() {
 	socket.create();
 	socket.bind(portNumber);
+	bool duplicate = false;
 
 	// Check the port
 	int socketPort = socket.portNumber();

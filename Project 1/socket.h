@@ -19,8 +19,9 @@ class Socket {
 		bool create();
 		bool bind(int port);
 		bool listen(int backlog);
+		bool closes();
 		bool accept(Socket& socket);
-		bool send(string data);
+		bool send(const char *data);
 		bool receive(string& data);
 		int portNumber();
 	private:

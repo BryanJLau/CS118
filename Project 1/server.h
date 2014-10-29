@@ -25,6 +25,7 @@ class Server {
 		string docRoot;
 		set<pid_t> childForks;
 		Socket socket;
+		//int duplicate;
 };
 
 #endif

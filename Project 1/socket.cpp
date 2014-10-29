@@ -10,6 +10,11 @@ Socket::~Socket() {
 	if(socketFd != -1) close(socketFd);
 }
 
+bool Socket::closes() {
+	cout << "closing socket" << endl;
+	close(socketFd);
+}
+
 bool Socket::create() {
 	// Create the socket
 	socketFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -40,8 +45,8 @@ bool Socket::listen(int backlog) {
     return ::listen(socketFd, backlog) == 0;
 }
 
-bool Socket::send(string data) {
-    return ::send(socketFd, data.c_str(), data.size(), 0) == 0;
+bool Socket::send(const char * data) {
+    return ::send(socketFd, data,strlen(data)+1, MSG_OOB) == 0;
 }
 
 bool Socket::receive(string& data) {
