@@ -28,7 +28,7 @@ bool Socket::bind(int port) {
     sockAddr.sin_addr.s_addr = INADDR_ANY;
     sockAddr.sin_port = htons(port);
 
-    return (::bind(socketFd, (struct sockaddr*) &sockAddr, sizeof(sockAddr)) == 0);
+    return ::bind(socketFd, (struct sockaddr*) &sockAddr, sizeof(sockAddr)) == 0;
 }
 
 bool Socket::accept( Socket& socket ) {
@@ -46,7 +46,7 @@ bool Socket::listen(int backlog) {
 }
 
 bool Socket::send(const char * data) {
-    return ::send(socketFd, data,strlen(data)+1, MSG_OOB) == 0;
+    return ::send(socketFd, data, strlen(data)+1, MSG_OOB) == 0;
 }
 
 bool Socket::receive(string& data) {

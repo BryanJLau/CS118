@@ -141,11 +141,6 @@ void Server::listen() {
 }
 
 void Server::handleRequest(Socket& responseSocket, const string& request) {
-	
-	
-	
-	
-	
 	string fileName = getFileName(request);
 
 	// this delete favicon things
@@ -199,29 +194,6 @@ void Server::handleRequest(Socket& responseSocket, const string& request) {
 		ifs.open(fileName.c_str(), ifstream::in);
 	}
 
-	responseCode = ifs.is_open() ? HTTP_OK : HTTP_NOT_FOUND;
-
-	char c = ifs.get();
-
-	//getting content length and content
-	long begin, end;
-	ifstream file(fileName.c_str());
-	begin = file.tellg();
-	file.seekg (0, ios::end);
-	end = file.tellg();
-	file.close();
-	int size = end - begin;
-	
-	string content( (istreambuf_iterator<char>(ifs)), 
-			(istreambuf_iterator<char>()  ));	
-	//////
-
-	while (ifs.good()) {
-		response.push_back(c);
-		c = ifs.get();
-	}
-	ifs.close();
-
 	// get date: information
 	time_t rawtime; 
 	struct tm * timeinfo; 
@@ -234,31 +206,47 @@ void Server::handleRequest(Socket& responseSocket, const string& request) {
 	/////////////////
 
 	
-
+	responseCode = ifs.is_open() ? HTTP_OK : HTTP_NOT_FOUND;
+	
+	char c = ifs.get();
+    while ( ifs.good() ) {
+        response.push_back(c);
+        c = ifs.get();
+    }
+	ifs.close();
+	
 	// header build up
 
 	//I dont know why but if I did not comment out following line of code does not write appropriately on client side. if I comment out the first header input which is HTTP...., it does send header appropriately but no new lines. 
 
-	header <<  "HTTP/1.1 " << responseCode << endl;
-	header <<  "Connection: keep-alive" << endl;
-	header << "Date: " << buffer << endl;
-	header << "Server: Apache/2.2.3 (CentOS)" << endl;
-	header << "Last-Modified: " << modified << endl;
-	header << "Content-Length: " << size << endl ;
-	if (responseCode != HTTP_NOT_FOUND)
-		header << "Content-Type: " << mimeType << endl << endl;;
-	
-	
-	const char* ct = content.c_str();
-	
-	
-	
-	
-	responseSocket.send(ct);
+	stringstream clientHeader;
+	// Send the client header to the client
+    clientHeader << "HTTP/1.1 " << responseCode << std::endl;
+	if ( HTTP_NOT_FOUND == responseCode ) {
+        clientHeader << "Content-Length: " << responseCode.size() << "\n\n";
+        responseSocket.send( header.str().c_str() );
+        responseSocket.send( responseCode.c_str() );
+        return;
+    }
+    clientHeader << "Content-Type: " << mimeType << std::endl;
+    clientHeader << "Content-Length: " << response.size() << "\n\n";
 
-	cout << endl << "Client Request:" << endl << request << endl;
-
-	cout  << header.str();
+    responseSocket.send( clientHeader.str().c_str() );
+    responseSocket.send( response.c_str() );
+    
+    // Console server response
+    stringstream serverHeader;
+    serverHeader <<  "HTTP/1.1 " << responseCode << endl;
+	serverHeader <<  "Connection: keep-alive" << endl;
+	serverHeader << "Date: " << buffer << endl;
+	serverHeader << "Server: Apache/2.2.3 (CentOS)" << endl;
+	serverHeader << "Last-Modified: " << modified << endl;
+	serverHeader << "Content-Type: " << mimeType << endl;
+	serverHeader << "Content-Length: " << response.size() << endl;
 	
+	cout << endl << "Client Request:" << endl << request;
+
+	cout << "Server Response:" << endl;
+	cout  << serverHeader.str() << endl;
 }
 
