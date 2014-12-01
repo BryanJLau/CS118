@@ -1,0 +1,20 @@
+Specific details in report in this directory.
+
+Jongwoo Kim (503-787-749) Seasnet ID: kimj
+Bryan Lau (404-015-053) Seasnet ID: bryanl
+
+
+————————————————————
+In bash, at the project1_(UID) directory
+
+make - create runnable program ./server
+./server - create web server on default port number and root (12345 : port number) 
+	   (/var/www) server 
+./server -p portnumber - create server on specific portnumber user want
+./server -w /www/ - set server location at /www/ 
+./server -h - help 
+./server -c - credit
+
+server.cpp is main source code for server
+socket.cpp is main source code for socket
+main.cpp actually runs the code

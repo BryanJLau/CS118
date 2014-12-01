@@ -6,6 +6,13 @@
 #include <unistd.h>
 #include <cerrno>
 #include <algorithm>
+#include <stdio.h>
+#include <string.h>
+#include <netdb.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
 
 GbnProtocol::GbnProtocol(int cRate, int dRate) {
     corruptRate = cRate;
@@ -105,26 +112,26 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
 }
 
 bool GbnProtocol::bind(const int port) {
-    close(true);
+    close();
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = htonl(INADDR_ANY);
     local.sin_port = htons(port);
 
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    
-    cout << "fd = " << sockFd <<endl;
-   
-    if(sockFd == -1 || ::bind(sockFd, (struct sockaddr*) &local,
-        sizeof(local)) < 1) {
-
+    if (sockFd == -1) {
         close(true);
         return false;
-
-    } else {
-        cout << "True" <<endl; 
-        return true;
     }
+
+    if (::bind(sockFd, (struct sockaddr*) &local, sizeof(local)) == 0) {
+
+        return true;
+    } else {
+        cout << "bind failure to " << port <<endl;
+        return false;
+    }
+
 }
 
 void GbnProtocol::close(bool destroy) {
@@ -251,8 +258,27 @@ bool GbnProtocol::sendPacket(packet const &pkt) {
 	return actualLength == transmittedLength;
 }
 
-bool GbnProtocol::receiveData(string &data) {
-	return false;
+int GbnProtocol::receiveData(char *data) {
+
+
+    cout << "receivedata func" << endl;
+
+    struct sockaddr_in rec_addr;
+    unsigned char buf[2048];
+    // struct sockaddr_in receiver_add;
+    socklen_t addrlen = sizeof(rec_addr);
+    int recvlen = recvfrom(sockFd, buf, sizeof(buf)-1, 0, 
+        (struct sockaddr *)&rec_addr, &addrlen);
+    memcpy(data, buf, recvlen);
+    data[recvlen] = '\0';
+    
+    if (recvlen > 0) {
+        cout << "recvlen = " << recvlen << endl;
+        return recvlen;
+    } else  {
+        cout << "fail recvfrom" << endl;
+        return -1;
+    }
 }
 
 bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddr) {

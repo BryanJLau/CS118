@@ -10,4 +10,4 @@ server: $(HOST_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(HOST_OBJS)
 
 clean:
-	rm -fr *~ *.o server client
+	rm -fr *~ *.o server

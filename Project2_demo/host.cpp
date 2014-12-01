@@ -23,6 +23,7 @@ void help() {
     cout << "./server - Display this message.\n";
     cout << "./server -p X - Run the server on port X.\n";
     cout << "./server -f X - Send file X.\n";
+    // I am not sure aoubt send file, do we have to send file mannualy though the server
     cout << "./server -c X - \% of packets to pretend to corrupt (int).\n";
     cout << "./server -d X - \% of packets to pretend to drop (int).\n";
     return;
@@ -87,9 +88,10 @@ int main(int argc, char **argv) {
 		    case '?':
 			    ch = (char) optopt;
 			    cerr << "Option -" << ch << " requires an argument.\n";
-			    if (isprint (optopt))
+			    if (isprint (optopt)) {
 				    cerr << "Unknown option `" << ch << "'.\n";
-			    else
+					help();
+			    } else
 				    cerr << "Unknown option character `\\x" << ch << "'.\n";
 				    return 1;
 			    break;
@@ -108,19 +110,7 @@ int main(int argc, char **argv) {
         cout << "No file specified, using default file: README.\n";
         fileName = "README";
     }
-    
-    if(corruptRate == -1) {
-        // Empty corruption rate, set to default
-        cout << "No corruption rate specified, using default " <<
-            "rate: 0\%.\n";
-        corruptRate = 0;
-    }
-    
-    if(dropRate == -1) {
-        // Empty drop rate, set to default
-        cout << "No drop rate specified, using default " << "rate: 0\%.\n";
-        dropRate = 0;
-    }
+
     
     connection = new GbnProtocol(corruptRate, dropRate);
     if(!connection->listen(port)) {
@@ -135,36 +125,42 @@ int main(int argc, char **argv) {
     	<< endl;
 	
 	while(true) {
+		cout << "loop " << endl;
 		// Wait for an actual connection
-		if(!connection->accept()) continue;
+		// if(!connection->accept()) continue;
 		
-		string recvData;
-		connection->receiveData(recvData);
-		
-		// Open the file (if it exists)
-		int fd = open(recvData.c_str(), O_RDONLY);
-		// Failed to open the file
-		if(fd == -1) {
+		char *recvData;
+		if (connection->receiveData(recvData) != -1) {
+			cout << "filename = " << recvData;
+			int file = open(recvData, O_RDONLY);
+
+			if(file == -1) {
 			cout << "Invalid file request: \"" << recvData << "\"\n";
 			connection->close();
 			continue; // We want to keep the server alive, not destroy it
+			} else {
+				string data = "";
+				char buffer[MAX_BUFFER + 1]; // Need a \0 at the end
+				memset(buffer, 0, MAX_BUFFER);
+		
+				// Read the contents of the file into a string
+				int length = read(file, buffer, MAX_BUFFER);
+			
+				while(length > 0) {
+					data.append(buffer, length);
+					memset(buffer, 0, MAX_BUFFER);
+				}
+		
+				// Send the data and close
+				connection->sendData(data);
+				connection->close();
+			}
 		}
 		
-		string data = "";
-		char buffer[MAX_BUFFER + 1]; // Need a \0 at the end
-		memset(buffer, 0, MAX_BUFFER);
 		
-		// Read the contents of the file into a string
-		int length = read(fd, buffer, MAX_BUFFER);
-		while(length > 0) {
-			data.append(buffer, length);
-			memset(buffer, 0, MAX_BUFFER);
-		}
 		
-		// Send the data and close
-		connection->sendData(data);
-		connection->close();
 	}
+	cout << "return" << endl;
 	
 	return 0;
 }
