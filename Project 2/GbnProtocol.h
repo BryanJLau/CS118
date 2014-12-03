@@ -28,6 +28,7 @@
  *  To signify the end of a file, we'll use an EOF, and an ACK for that as well
  *  To easily set the flags, we'll use masking on the flags part of the header
  */
+#define COR_MASK    1 << 7;
 #define EOFACK_MASK 1 << 6;
 #define EOF_MASK    1 << 5;
 #define SYNACK_MASK 1 << 4;
@@ -76,6 +77,7 @@ class GbnProtocol {
         int dropRate;
         int corruptRate;
         
+        bool isCorrupted(packet &pkt) { return pkt.header.flags & COR_MASK; }
         bool isEofAck(packet &pkt) { return pkt.header.flags & EOFACK_MASK; }
         bool isEof(packet &pkt) { return pkt.header.flags & EOF_MASK; }
         bool isSynAck(packet &pkt) { return pkt.header.flags & SYNACK_MASK; }
@@ -84,6 +86,7 @@ class GbnProtocol {
         bool isSyn(packet &pkt) { return pkt.header.flags & SYN_MASK; }
         bool isFin(packet &pkt) { return pkt.header.flags & FIN_MASK; }
 
+        void setCorrupted(packet &pkt) { pkt.header.flags |= COR_MASK; }
         void setEofAck(packet &pkt) { pkt.header.flags |= EOFACK_MASK; }
         void setEof(packet &pkt) { pkt.header.flags |= EOF_MASK; }
         void setSynAck(packet &pkt) { pkt.header.flags |= SYNACK_MASK; }

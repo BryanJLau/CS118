@@ -255,8 +255,87 @@ bool GbnProtocol::receiveData(string &data) {
 	return false;
 }
 
-bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddr) {
-	return false;
+bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddrIn) {
+	memset(&pkt, 0, sizeof(pkt));
+    sockaddr_in* addr = NULL;
+    if(sockaddrIn) addr = sockaddrIn;
+    else addr = new sockaddr_in();
+    
+    bool validHeader = false;
+    
+    // We're not even connected
+    if(sockFd == -1) return false;
+    
+    // Try to read a packet from the UDP buffer
+    while(!validHeader) {
+        size_t headerLength = 0;
+        socklen_t addrLength = sizeof(addr);
+        
+        headerLength = recvfrom(sockFd, &pkt.header, sizeof(pkt.header), 
+            MSG_PEEK, (sockaddr*)addr, &addrLength);
+            
+        // Socket timeout
+        if(headerLength == -1 && errno == EWOULDBLOCK) {
+            dropPacket(pkt);
+            cout << "Socket timeout while waiting for packet.\n";
+            return false;
+        }
+        
+        // The whole header might not be here yet
+        if(headerLength < sizeof(pkt.header)) continue;
+        
+        validHeader = true;
+    
+        // Now that the header is here, we assume the rest of the packet is too
+        size_t packetLength;
+        size_t packetSize = min(sizeof(pkt), pkt.header.length +
+            sizeof(pkt.header));
+        packetLength = recvfrom(sockFd, &pkt, packetSize, 0, NULL, NULL);
+        
+        if(errno == EWOULDBLOCK) {
+            cout << "Socket timeout while receiving packet.\n";
+            return false;
+        }
+        if(packetLength == -1) {
+            cout << "Transmission error.\n";
+            dropPacket(pkt);
+            validHeader = false;
+            continue;
+        }
+        if(packetSize < packetLength) {
+            cout << "Packet was shorter than expected, dropping.\n";
+            dropPacket(pkt);
+            validHeader = false;
+            continue;
+        }
+        if(!isEofAck(pkt) && isCorrupted(pkt)) {
+            cout << "Received simulated corrupted packet.\n";
+            dropPacket(pkt);
+            return false;
+        }
+        if(random() % 100 < dropRate) {
+            cout << "Simulating dropped packet.\n";
+            dropPacket(pkt);
+            errno = EWOULDBLOCK;
+            return false;
+        }
+    }
+    
+    // We now have a valid packet
+    // SYNACK if SYN immediately
+    packet outPacket = buildPacket();
+    if(isSyn(pkt)) {
+        setSynAck(outPacket);
+        cout << "Received SYN, SYNACK'ing now.\n";
+    } else if(isFin(pkt)) {
+        // We're almost done with this connection!
+        cout << "Received FIN, FINACK'ing now.\n";
+        finned = true;
+        setFinAck(outPacket);
+    }    
+    
+    sendPacket(outPacket);
+    return true;
 }
 
 GbnProtocol::packet GbnProtocol::buildPacket(string const &data,
