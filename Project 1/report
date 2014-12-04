@@ -1,0 +1,163 @@
+COM SCI 118 Computer Network Fundamentals
+Project 1: Concurrent Web Server using BSD Sockets
+Fall 2014
+
+Jongwoo Kim (503-787-749) Seasnet ID: kimj
+Bryan Lau (404-015-053) Seasnet ID: bryanl
+
+
+MANUAL!!
+——————————
+In bash, at the project1_(UID) directory
+
+make - create runnable program ./server
+./server - create web server on default port number and root (12345 : port number) 
+	   (/var/www) server 
+./server -p portnumber - create server on specific portnumber user want
+./server -w /www/ - set server location at /www/ 
+./server -h - help 
+./server -c - credit
+
+server.cpp is main source code for server
+socket.cpp is main source code for socket
+main.cpp actually runs the code
+
+———————————
+
+
+High Level Description
+Running ./server first calls the main function, which instantiates all the necessary properties of the server (port and document root), or displays a help message. After that, it creates a new Server object, and tells the server to start listening for incoming connections.
+The listen function attempts to bind a socket to the port. If it fails to do so, it exits. If it succeeds, then it listens for connections, and accepts them through the socket. It then creates a new socket, and passes on the data to that socket for further handling.
+This new socket then parses the input data for a file. It tries to open the file, and if successful, returns a 200 OK status code and sends the contents back with the appropriate header through the socket. If it fails, then it gives a 404 Not Found status code.
+
+----------------------------------------
+
+After part 1 of the project finished, we tested our implementation work through HTTP connection. In the cs118 ubuntu, we requested a HTTP connection using a unique portnumbers. First, we start the server using ./server -p unique portnumber create a webserver on /var/www/ directory. Puting 127.0.0.1:portnumber/index.html on web browser(same machine), a client can initiate HTTP connection to /var/www and request index.html file. The terminal(Console) displays the request message, but it prints 3 request messages at first test. It duplicates the request messages in handleRequest(), a function to create response messages and requestmessages and to send contents of request file through socket. Among 3 request messages, 2 request messages are not appropirate messages. I assumed that during http connection, there are another requests that we did not expect.
+
+Inappropriate request message example:
+
+Client Request:
+GET /favicon.ico HTTP/1.1
+Host: 127.0.0.1:30004
+User-Agent: Mozilla/5.0 (X11; Linux i686; rv:7.0.1) Gecko/20100101 Firefox/7.0.1
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-us,en;q=0.5
+Accept-Encoding: gzip, deflate
+Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7
+Connection: keep-alive
+
+GET /favicon.ico is a wrong request.
+
+proper request should display
+
+Get /index.html.
+
+To fix the bug, we thought it creates multiple messages because we used a forked child and maintatined the forked processes in while loop. We tried to control processes using waitpid, killing unneeded parent processes. Eventhough we could manage the processes, 3 request messages kept displayed. We finally figured out that fork() method did not create duplicate request messages after we tried single process in while loop. We actually did not find an exact problem; we simply change the handleRequest() to return when there is a request about favicon.ico.
+
+We also tested an image file request and content-type correctly diplays it is an image file request.
+
+
+PART B) displays contents on the browser(client side) and displays header on console(server side).
+
+To implement a response message, we used a stringstream and we accumulately put the information like a typical response message.
+
+1) HTTP/1.1 200 OK
+
+we simply add "HTTP/1.1" string to header and we can check and add 200 OK or 404 Not Found to the stringstream using is_open() method using ifstream API.
+
+2) Connection: Keep alive
+
+This part was already implemented on Part 1.
+
+3) Date: Tue, 09 Aug 2011 15:44:04 GMT
+
+Client Request:
+GET /favicon.ico HTTP/1.1
+Host: 127.0.0.1:30004
+User-Agent: Mozilla/5.0 (X11; Linux i686; rv:7.0.1) Gecko/20100101 Firefox/7.0.1
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-us,en;q=0.5
+Accept-Encoding: gzip, deflate
+Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7
+Connection: keep-alive
+
+GET /favicon.ico is a wrong request.
+
+proper request should display
+
+Get /index.html.
+
+To fix the bug, we thought it creates multiple messages because we used a forked child and maintatined the forked processes in while loop. We tried to control processes using waitpid, killing unneeded parent processes. Eventhough we could manage the processes, 3 request messages kept displayed. We finally figured out that fork() method did not create duplicate request messages after we tried single process in while loop. We actually did not find an exact problem; we simply change the handleRequest() to return when there is a request about favicon.ico.
+
+We also tested an image file request and content-type correctly diplays it is an image file request.
+
+
+PART B) displays contents on the browser(client side) and displays header on console(server side).
+
+To implement a response message, we used a stringstream and we accumulately put the information like a typical response message.
+
+1) HTTP/1.1 200 OK
+
+we simply add "HTTP/1.1" string to header and we can check and add 200 OK or 404 Not Found to the stringstream using is_open() method using ifstream API.
+
+2) Connection: Keep alive
+
+This part was already implemented on Part A).
+
+3) Date: Tue, 09 Aug 2011 15:44:04 GMT
+
+#include <ctime>
+#include "sys/stat.h"
+#include "unistd.h"
+#include "time.h"
+
+using this libraries, we can use localtime(), which create time information to time_t object. Also, strtime() is used to create a char array to put time information according to date format of response message.
+
+4) Server: Apache/2.2.3 (CentOS)
+
+We simply add exact string to header stringstream.
+
+5) Last-Modified: Tue, 20 Oct 20131 14:44:04 GMT
+
+This also can be implemented using libraries used in 3)Date part; however, it requires stat struct to hold a requested file information using stat(). We can get time information using gmtime()function passing the stat struct as a parameter. Finally, strftime() to generate a date format before puting it to headery.
+
+6) Content-Length: 300
+
+content-length is can be found using tellg() and seekg() in ifstream API.
+
+	long begin, end;
+	ifstream file(fileName.c_str());
+	begin = file.tellg();
+	file.seekg (0, ios::end);
+	end = file.tellg();
+	file.close();
+	int size = end - begin;
+
+tellg() is used to check byte at file and seekg(0. ios::end) moves to end of file and check its byte at the location and simply we can get the size of file(Content-Length) of the requested file.
+
+7) Content-Type
+
+Implemented on Part A).
+
+
+----------------------------------------
+Content of file)
+
+Content of file should be sent to the window of client; using istreambuf_iterator on opened ifstream object, we can get a string which is created by iterating from beginning of the file to the end by istreambuf_iterator.
+
+The string containing content becomes const char* array by calling c_str() function in string API. The content is sent over socket and socket.send() actually sends the content to client (displaying on web browser of client).
+
+Socket.send() uses send() function in #include <sys/socket.h> API.
+
+::send(socketFd, data,strlen(data)+1, MSG_OOB)
+
+It requires the length of const char array , const char array and flag. To display, MSG_OOB flag sends the char array to display on client side. 
+
+----------------------------------------
+
+How to compile and run
+To compile, just execute "make" in the directory. This will create an executable file called "server".
+
+TO run, you can simply execute "./server" in the directory. This will default the port number to "12345" and the document root to "/var/www/" (absolute path). To specify a custom port, use the -p command followed by the port number (eg. -p 80), and to specify a custom document root, use the -w command (eg. -w ./www to set the root to be a folder inside the server directory called "www").
+
+

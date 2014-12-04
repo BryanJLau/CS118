@@ -111,18 +111,20 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
 }
 
 bool GbnProtocol::bind(const int port) {
-    close();
-    
+    close(true);
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = htonl(INADDR_ANY);
     local.sin_port = htons(port);
-    
+
+
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if(sockFd == -1 || ::bind(sockFd, (struct sockaddr*) &local,
         sizeof(local)) < 0) {
         close();
         return false;
-    } else return true;
+    } else {
+        return true;
+    }
 }
 
 void GbnProtocol::close(bool destroy) {
@@ -198,7 +200,7 @@ void GbnProtocol::close(bool destroy) {
 }
 
 bool GbnProtocol::listen(int const port) {
-    close(true);
+    close();
     listening = bind(port);
     return listening;
 }
@@ -572,5 +574,4 @@ GbnProtocol::packet GbnProtocol::buildPacket(string const &data,
 		retPacket.header.length);
 	return retPacket;
 }
-
 

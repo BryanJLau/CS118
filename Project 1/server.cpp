@@ -194,6 +194,33 @@ void Server::handleRequest(Socket& responseSocket, const string& request) {
 		ifs.open(fileName.c_str(), ifstream::in);
 	}
 
+<<<<<<< Updated upstream
+=======
+	responseCode = ifs.is_open() ? HTTP_OK : HTTP_NOT_FOUND;
+
+	char c = ifs.get();
+
+	//getting content length and content
+	long begin, end;
+	ifstream file(fileName.c_str());
+	begin = file.tellg();
+	file.seekg (0, ios::end);
+	end = file.tellg();
+	file.close();
+	int size = end - begin;
+
+	//content
+	string content( (istreambuf_iterator<char>(ifs)), 
+			(istreambuf_iterator<char>()  ));	
+	//////
+
+	while (ifs.good()) {
+		response.push_back(c);
+		c = ifs.get();
+	}
+	ifs.close();
+
+>>>>>>> Stashed changes
 	// get date: information
 	time_t rawtime; 
 	struct tm * timeinfo; 
