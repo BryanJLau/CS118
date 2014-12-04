@@ -1,13 +1,19 @@
 CC = g++
-CFLAGS = -g -Wall -Wextra -Werror
+CFLAGS = -g -O0 -Wall -Wextra -Werror
 
 HOST_SRCS = host.cpp GbnProtocol.cpp
 HOST_OBJS = $(subst .cpp,.o,$(HOST_SRCS))
 
-all: sender
+CLIENT_SRCS = client.cpp GbnProtocol.cpp
+CLIENT_OBJS = $(subst .cpp,.o,$(CLIENT_SRCS))
 
-sender: $(HOST_OBJS)
+all: server receiver
+
+server: $(HOST_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(HOST_OBJS)
+	
+receiver: $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(CLIENT_OBJS)
 
 clean:
-	rm -fr *~ *.o sender receiver
+	rm -fr *~ *.o server receiver

@@ -4,8 +4,12 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <string>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <cstring>
+#include <unistd.h>
 
-#define WINDOW_SIZE 4
+#define WINDOW_SIZE 1024
 
 #define MTU 1024
 #define IP_HEADER 20

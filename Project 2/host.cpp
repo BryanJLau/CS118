@@ -25,6 +25,7 @@ void help() {
     cout << "./server -f X - Send file X.\n";
     cout << "./server -c X - \% of packets to pretend to corrupt (int).\n";
     cout << "./server -d X - \% of packets to pretend to drop (int).\n";
+    return;
 }
 
 GbnProtocol *connection = NULL;
@@ -53,10 +54,10 @@ int main(int argc, char **argv) {
 
     if(argc == 1) {
         help();
-        exit(0);
+        return 0;
     }
 
-    while ((c = getopt (argc, argv, "f:p:c:d:")) != -1) 
+    while ((c = getopt (argc, argv, "f:p:c:d:")) != -1) {
 	    switch (c) {
 		    case 'p':
 			    // Specify port number
@@ -79,22 +80,24 @@ int main(int argc, char **argv) {
 		    case 'd':
 			    // Specify drop rate
 			    optString.assign(optarg);
-			    cout << "Setting corruption rate to " << optString <<
+			    cout << "Setting drop rate to " << optString <<
 			        "\%" << endl;
 			    dropRate = atoi(optarg);
 			    break;
 		    case '?':
 			    ch = (char) optopt;
 			    cerr << "Option -" << ch << " requires an argument.\n";
-			    if (isprint (optopt))
+			    if (isprint (optopt)) {
 				    cerr << "Unknown option `" << ch << "'.\n";
-			    else
+					help();
+			    } else
 				    cerr << "Unknown option character `\\x" << ch << "'.\n";
 				    return 1;
 			    break;
 		    default:
 			    abort();
 	    }
+    }
 
     if(port == -1) {
         // Empty port, set to default
@@ -107,20 +110,17 @@ int main(int argc, char **argv) {
         cout << "No file specified, using default file: README.\n";
         fileName = "README";
     }
-    
-    if(corruptRate == -1) {
-        // Empty corruption rate, set to default
-        cout << "No corruption rate specified, using default " <<
-            "rate: 0\%.\n";
+    if(corruptRate < 0) {
+        // Negative corruptRate
+        cout << "No corrupt rate specified, using default rate: 0\%.\n";
         corruptRate = 0;
     }
-    
-    if(dropRate == -1) {
-        // Empty drop rate, set to default
-        cout << "No drop rate specified, using default " << "rate: 0\%.\n";
+    if(dropRate < 0) {
+        // Negative dropRate
+        cout << "No drop rate specified, using default rate: 0\%.\n";
         dropRate = 0;
     }
-    
+
     connection = new GbnProtocol(corruptRate, dropRate);
     if(!connection->listen(port)) {
     	// Listen failed
@@ -130,39 +130,43 @@ int main(int argc, char **argv) {
     	exit(-1);
     }
     
-    cout << "Server is now listening on port " << connection->portNumber()
-    	<< endl;
+    cout << "Server is now listening on port " << 
+        connection->portNumber() << endl;
 	
 	while(true) {
+	cout << "what?";
 		// Wait for an actual connection
 		if(!connection->accept()) continue;
 		
-		string recvData;
-		connection->receiveData(recvData);
+		string recvData = "";
+		if (connection->receiveData(recvData) != -1) {
+			int file = open(recvData.c_str(), O_RDONLY);
+
+			if(file == -1) {
+			    cout << "Invalid file request: \"" << recvData << "\"\n";
+			    connection->close();
+			    continue; // We want to keep the server alive, not destroy it
+			} else {
+			    cout << "Preparing to send file...\n";
+				string data = "";
+				char buffer[MAX_BUFFER + 1]; // Need a \0 at the end
+				memset(buffer, 0, MAX_BUFFER);
 		
-		// Open the file (if it exists)
-		int fd = open(recvData.c_str(), O_RDONLY);
-		// Failed to open the file
-		if(fd == -1) {
-			cout << "Invalid file request: \"" << recvData << "\"\n";
-			connection->close();
-			continue; // We want to keep the server alive, not destroy it
+				// Read the contents of the file into a string
+				int length = read(file, buffer, MAX_BUFFER);
+			
+				while(length > 0) {
+					data.append(buffer, length);
+					memset(buffer, 0, MAX_BUFFER);
+				}
+		
+				// Send the data and close
+				connection->sendData(data);
+				connection->close();
+				
+				recvData = "";
+			}
 		}
-		
-		string data = "";
-		char buffer[MAX_BUFFER + 1]; // Need a \0 at the end
-		memset(buffer, 0, MAX_BUFFER);
-		
-		// Read the contents of the file into a string
-		int length = read(fd, buffer, MAX_BUFFER);
-		while(length > 0) {
-			data.append(buffer, length);
-			memset(buffer, 0, MAX_BUFFER);
-		}
-		
-		// Send the data and close
-		connection->sendData(data);
-		connection->close();
 	}
 	
 	return 0;

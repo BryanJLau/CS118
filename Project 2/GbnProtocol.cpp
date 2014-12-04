@@ -44,6 +44,8 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
     
     finned = false;
     
+    cout << "Setting remote info.\n";
+    
     // Set remote info
     remote.sin_family = AF_INET;
     remote.sin_port = htons(port);
@@ -52,6 +54,8 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
         close();
         return false;
     }
+    
+    cout << "Setting socket timeout.\n";
     
     // Socket timeout
     timeval timeout;
@@ -69,6 +73,8 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
     setSyn(outPacket);
     // If this is an ACK as well as a SYN...
     if(ack) setSynAck(outPacket);
+    
+    cout << "Sending SYN packet.\n";
     
     if(!sendPacket(outPacket)) {
         cout << "Failed to send SYN packet.\n";
@@ -112,9 +118,8 @@ bool GbnProtocol::bind(const int port) {
     local.sin_port = htons(port);
     
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    
     if(sockFd == -1 || ::bind(sockFd, (struct sockaddr*) &local,
-        sizeof(local)) < 1) {
+        sizeof(local)) < 0) {
         close();
         return false;
     } else return true;
@@ -199,8 +204,10 @@ bool GbnProtocol::listen(int const port) {
 }
 
 bool GbnProtocol::accept() {
+cout << "Accepting";
 	char addr[INET_ADDRSTRLEN];
 	sockaddr_in inAddr;
+	packet inPacket;
 	
 	// You can't accept if you're not listening!
 	if(!listening) return false;
@@ -210,8 +217,7 @@ bool GbnProtocol::accept() {
 	
 	// Try to connect
 	while(!connected) {
-		memset(&inAddr, 0, sizeof(inAddr));
-		packet inPacket;
+	    memset(&inAddr, 0, sizeof(inAddr));
 		// If you can't receive a packet, keep looping
 		if(!receivePacket(inPacket, &inAddr)) continue;
 		
@@ -232,6 +238,155 @@ bool GbnProtocol::accept() {
 }
 
 bool GbnProtocol::sendData(string const &data) {
+    // Window Data
+    int numWindows = WINDOW_SIZE/MSS + 1;
+    int currentWindow = 0;
+    struct window {
+        bool acked;
+        size_t sequenceNumber;
+        timeval timeSent;
+    };
+    window windows[numWindows];
+    
+    // Initialize the windows
+    for(int i = 0; i < numWindows; i++) {
+        windows[i].acked = true; // So they can be replaced immediately
+        windows[i].sequenceNumber = 0;
+        windows[i].timeSent.tv_usec = 0;
+        windows[i].timeSent.tv_sec = 0;
+    }
+    
+    size_t totalUnackedBytes, totalAckedBytes, lastAck;
+    totalUnackedBytes = totalAckedBytes = lastAck = 0;
+    uint16_t timeouts = 0;
+    
+    size_t length = data.length();
+    cout << "Transmitting file: " << data << " with length " << length << endl;
+    
+    bool retransmit;
+    
+    while(true) {
+        retransmit = false;
+    
+        // Check if we're done
+        if(totalAckedBytes >= length && length != 0) {
+            cout << "Job complete.\n";
+            return true;
+        }
+        
+        while(totalUnackedBytes + totalAckedBytes < length &&
+            totalUnackedBytes < WINDOW_SIZE && windows[currentWindow].acked) {
+            // Don't send too much data
+            size_t packetSize, maxPacketSize;
+            maxPacketSize = min((size_t) WINDOW_SIZE - totalUnackedBytes,
+                sizeof(packet));
+            packet outPacket = buildPacket(data, maxPacketSize,
+                totalUnackedBytes + totalAckedBytes);
+            packetSize = sizeof(outPacket);
+            
+            // Set up the window
+            outPacket.header.sequenceNumber = totalAckedBytes + totalUnackedBytes;
+            windows[currentWindow].acked = false;
+            windows[currentWindow].sequenceNumber =
+                outPacket.header.sequenceNumber;
+            gettimeofday(&windows[currentWindow].timeSent, NULL);
+                
+            // Check if this is the EOF packet
+            if((totalUnackedBytes + totalAckedBytes) >= length) {
+                cout << "Reached EOF, setting EOF flag.\n";
+                setEof(outPacket);
+            }
+            
+            // Transmit packet
+            cout << "Transmitting packet with sequence number " <<
+                outPacket.header.sequenceNumber << endl;
+            sendPacket(outPacket);
+            
+            // Move the window
+            (++currentWindow) %= numWindows;
+        }
+        
+        // All the windows are filled, or we sent enough data
+        // Check for timeouts
+        for(int i = 0; i < numWindows; i++) {
+            timeval now;
+            gettimeofday(&now, NULL);
+            
+            // Setup times
+            long sec = now.tv_sec - windows[i].timeSent.tv_sec;
+            long usec = now.tv_usec - windows[i].timeSent.tv_usec;
+            bool timedout = sec > TIMEOUT_SEC ||
+                (sec == TIMEOUT_SEC && usec > TIMEOUT_USEC);
+            
+            if(!windows[i].acked && timedout) {
+                // Timed out, resend this and all others after
+                // Reset most things
+                totalUnackedBytes = 0;
+                (--currentWindow) %= numWindows;
+                for(int j = 0; j < numWindows; j++) windows[j].acked = true;
+                
+                cout << "Packet with sequence number " <<
+                    windows[i].sequenceNumber <<
+                    " timed out, resending all in current window.\n";
+                retransmit = true;
+                break;
+            }
+            
+            if(retransmit) continue; // Skip sending new data
+            
+            // Sent everything, time to wait for ACKs
+            packet inPacket;
+            if(receivePacket(inPacket)) {
+                if(isFin(inPacket)) {
+                    cout << "Received FIN, closing.\n";
+                    close();
+                    return false;
+                } else if(!isAck(inPacket)) {
+                    cout << "Expected ACK, dropping packet.\n";
+                    dropPacket(inPacket);
+                } else {
+                    // We're good to go
+                    size_t ack = inPacket.header.ackNumber;
+                    cout << "Received ACK " << ack << endl;
+                    if(ack > (totalUnackedBytes + totalAckedBytes)) {
+                        cout << "Received larger ACK, dropping packet.\n";
+                        dropPacket(inPacket);
+                        continue;
+                    }
+                    
+                    // Check for duplicate ACK
+                    if(ack < lastAck) {
+                        cout << "Dropping duplicate ACK.\n";
+                        dropPacket(inPacket);
+                    } else {
+                        for(int i = 0; i < numWindows; i++) {
+                            if(!windows[i].acked &&
+                                windows[i].sequenceNumber <= ack) {
+                                windows[i].acked = true;
+                                cout << "Received correct ACK " << ack;
+                            }
+                        }
+                        totalAckedBytes = ack;
+                        totalUnackedBytes -= (ack - lastAck);
+                        lastAck = ack;
+                        timeouts = 0;
+                    }
+                }
+            } else {
+                // We didn't receive a packet in time
+                timeouts++;
+                cout << "Timed out, current attempts: " << timeouts <<
+                    "/" << MAX_TRANSMITS << endl;
+                
+                // Check to see if we reached the max
+                if(timeouts >= MAX_TRANSMITS) {
+                    cout << "Reached maximum timeouts.\n";
+                    return false;
+                }
+            }
+        }
+    }
+    
 	return false;
 }
 
@@ -245,7 +400,70 @@ bool GbnProtocol::sendPacket(packet const &pkt) {
 }
 
 bool GbnProtocol::receiveData(string &data) {
-	return false;
+    packet inPacket, outPacket;
+    uint16_t timeouts = 0;
+    size_t receivedBytes = 0;
+    bool eof = false;
+    
+    while(true) {
+        if(receivePacket(inPacket)) {
+            // Got a packet!
+            if(inPacket.header.sequenceNumber <= receivedBytes) {
+                // This was a duplicate packet
+                cout << "Received duplicate packet, sending correct ACK.\n";
+                outPacket = buildPacket();
+                outPacket.header.ackNumber = inPacket.header.sequenceNumber;
+                
+                sendPacket(outPacket);
+                continue;
+            } else if ((int) (inPacket.header.sequenceNumber - MSS) >
+                (int) receivedBytes) {
+                // Unexpected sequence number
+                cout << "Out of range sequence number.\n";
+                dropPacket(inPacket);
+                continue;
+            } else {
+                // We finally have a correct sequence number
+                // Append the data to what we have
+                if(inPacket.header.length > 0)
+                    data.append(inPacket.payload, inPacket.header.length);
+                
+                // Reset the timeout count and increment received bytes
+                timeouts = 0;
+                receivedBytes += inPacket.header.length;
+                
+                // Time to ACK
+                outPacket = buildPacket();
+                outPacket.header.ackNumber = inPacket.header.sequenceNumber;
+                setAck(outPacket);
+                cout << "Sending ACK " << outPacket.header.ackNumber;
+                
+                // Check to see if it's a FIN, close since it's unexpected
+                if(isFin(inPacket)) {
+                    cout << "Received FIN, closing.\n";
+                    close();
+                    return true;
+                }
+                if(isEof(inPacket)) {
+                    cout << "Received EOF, job completed.\n";
+                    return true;
+                }
+            }
+        } else {
+            // We didn't receive a packet in time
+            timeouts++;
+            cout << "Timed out, current attempts: " << timeouts <<
+                "/" << MAX_TRANSMITS << endl;
+            
+            // Check to see if we reached the max
+            if(timeouts >= MAX_TRANSMITS) {
+                cout << "Reached maximum timeouts.\n";
+                return false;
+            }
+        }
+    }
+    
+    return false;
 }
 
 bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddrIn) {
@@ -354,4 +572,5 @@ GbnProtocol::packet GbnProtocol::buildPacket(string const &data,
 		retPacket.header.length);
 	return retPacket;
 }
+
 
