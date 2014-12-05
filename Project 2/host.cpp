@@ -134,7 +134,6 @@ int main(int argc, char **argv) {
         connection->portNumber() << endl;
 	
 	while(true) {
-	cout << "what?";
 		// Wait for an actual connection
 		if(!connection->accept()) continue;
 		

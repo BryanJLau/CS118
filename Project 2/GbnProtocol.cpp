@@ -206,7 +206,6 @@ bool GbnProtocol::listen(int const port) {
 }
 
 bool GbnProtocol::accept() {
-cout << "Accepting";
 	char addr[INET_ADDRSTRLEN];
 	sockaddr_in inAddr;
 	packet inPacket;
