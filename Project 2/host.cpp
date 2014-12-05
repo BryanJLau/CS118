@@ -22,9 +22,9 @@ void help() {
     cout << "Server parameters:\n";
     cout << "./server - Display this message.\n";
     cout << "./server -p X - Run the server on port X.\n";
-    cout << "./server -f X - Send file X.\n";
     cout << "./server -c X - \% of packets to pretend to corrupt (int).\n";
     cout << "./server -d X - \% of packets to pretend to drop (int).\n";
+    cout << "./server -w X - Number of windows to use (int).\n";
     return;
 }
 
@@ -57,18 +57,13 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    while ((c = getopt (argc, argv, "f:p:c:d:w:")) != -1) {
+    while ((c = getopt (argc, argv, "p:c:d:w:")) != -1) {
 	    switch (c) {
 		    case 'p':
 			    // Specify port number
 			    optString.assign(optarg);
 			    cout << "Setting port to " + optString << endl;
 			    port = atoi(optarg);
-			    break;
-		    case 'f':
-			    // Specify document root
-			    fileName.assign(optarg);
-			    cout << "Setting file to " << fileName << endl;
 			    break;
 		    case 'c':
 			    // Specify corrupt rate
@@ -109,12 +104,6 @@ int main(int argc, char **argv) {
         // Empty port, set to default
         cout << "No port specified, using default port: 12345.\n";
         port = 12345;
-    }
-    
-    if(fileName == "") {
-        // Empty root, set to default
-        cout << "No file specified, using default file: README.\n";
-        fileName = "README";
     }
     if(corruptRate < 0) {
         // Negative corruptRate
