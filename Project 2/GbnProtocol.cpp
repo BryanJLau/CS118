@@ -18,6 +18,47 @@ GbnProtocol::GbnProtocol(int cRate, int dRate) {
     srand(time(0));
 }
 
+bool GbnProtocol::network_set(int port) {
+    struct sockaddr_in local;
+    struct sockaddr_in remote;
+    addrlen = sizeof(remote);
+    
+    
+
+    if ((sockFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+        cout << "Cant create a socket" <<endl;
+        return false;
+    }
+
+
+    memset((char *)&local, 0, sizeof(local));
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_ANY);
+    local.sin_port = htons(port);
+
+    if (::bind(sockFd, (struct sockaddr *)&local, sizeof(local)) < 0 ) {
+        cout << "bind fail!" << endl;
+        return false;
+    }
+
+    
+    cout << "Server is now listening on port " << 
+        port << endl;
+    return true;
+}
+
+bool GbnProtocol::receiveMsg() {
+    recvlen = recvfrom(sockFd, buf, 2048, 0, (struct sockaddr *)&remote, &addrlen);
+    if (recvlen > 0) {
+        buf[recvlen] = 0;
+        cout << buf << endl;
+        return true;
+    } else 
+        return false;
+
+
+}
+
 void GbnProtocol::dropPacket(packet &pkt) {
 	// To simulate a drop, we'll simply simulate an invalid packet
 	memset(&pkt, 0, sizeof(pkt));

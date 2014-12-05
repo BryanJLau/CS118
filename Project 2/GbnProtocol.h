@@ -46,6 +46,9 @@ using namespace std;
 class GbnProtocol {
     public:
         GbnProtocol(int cRate, int dRate);
+
+        bool network_set(int port);
+        bool receiveMsg();
         
         bool connect(string const &address, int const port, bool ack);
         bool listen(int const port);
@@ -74,9 +77,16 @@ class GbnProtocol {
         bool listening;
         bool connected;
         bool finned;
+        
         int sockFd;
+        int port;
+        int recvlen;
+        
         sockaddr_in remote;
         sockaddr_in local;
+        socklen_t addrlen;
+
+        unsigned char buf[2048];
         
         int dropRate;
         int corruptRate;

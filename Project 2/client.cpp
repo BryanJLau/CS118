@@ -159,7 +159,7 @@ int main(int argc, char **argv) {
 
     memcpy((void *)&servaddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
-    string message = "no message";
+    string message = fileName;
     const char* c_message = message.c_str();
 
     cout << c_message << endl;
@@ -176,33 +176,33 @@ int main(int argc, char **argv) {
         return 0;
     }
     
-    char addr[INET_ADDRSTRLEN];
-    memset(&addr, 0, sizeof(addr));
+    // char addr[INET_ADDRSTRLEN];
+    // memset(&addr, 0, sizeof(addr));
     
-    struct hostent *he = gethostbyname(hostname.c_str());
-    if(he && he->h_length > 0) {
-        // Found the host!
-        inet_ntop(AF_INET, he->h_addr_list[0], addr, sizeof(addr));
-    } else {
-        // Couldn't find host
-        cout << "Could not find host: " << hostname << endl;
-        exit(-1);
-    }
+    // struct hostent *he = gethostbyname(hostname.c_str());
+    // if(he && he->h_length > 0) {
+    //     // Found the host!
+    //     inet_ntop(AF_INET, he->h_addr_list[0], addr, sizeof(addr));
+    // } else {
+    //     // Couldn't find host
+    //     cout << "Could not find host: " << hostname << endl;
+    //     exit(-1);
+    // }
     
-    // Time to set up the connection and start sending
-    // We're going to use 0 for the receiver since the sender has this
-    connection = new GbnProtocol(0, 0);
-    string fileData = "";
-    if(!connection->connect(addr, port, false)) {
-        cout << "Failed to connect.\n";
-        exit(-1);
-    } else {
-        connection->sendData(fileName);
-        connection->receiveData(fileData);
-        connection->close();
-    }
+    // // Time to set up the connection and start sending
+    // // We're going to use 0 for the receiver since the sender has this
+    // connection = new GbnProtocol(0, 0);
+    // string fileData = "";
+    // if(!connection->connect(addr, port, false)) {
+    //     cout << "Failed to connect.\n";
+    //     exit(-1);
+    // } else {
+    //     connection->sendData(fileName);
+    //     connection->receiveData(fileData);
+    //     connection->close();
+    // }
     
-    cout << endl << fileData << endl;
+    // cout << endl << fileData << endl;
     
     return 0;
 }

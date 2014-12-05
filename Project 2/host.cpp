@@ -40,6 +40,35 @@ void signalHandler(int signal) {
     exit(signal);
 }
 
+bool network_set(int port) {
+	struct sockaddr_in myaddr;
+    struct sockaddr_in remaddr;
+    socklen_t addrlen = sizeof(remaddr);
+    int recvlen;
+    int sockFd;
+    unsigned char buf[2048];
+
+    if ((sockFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+    	cout << "Cant create a socket" <<endl;
+    	return false;
+    }
+
+
+    memset((char *)&myaddr, 0, sizeof(myaddr));
+    myaddr.sin_family = AF_INET;
+    myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    myaddr.sin_port = htons(port);
+
+    if (bind(sockFd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0 ) {
+    	cout << "bind fail!" << endl;
+    	return false;
+    }
+
+    
+    cout << "Server is now listening on port " << 
+        port << endl;
+}
+
 int main(int argc, char **argv) {
     int port, corruptRate, dropRate;
     string fileName, optString;
@@ -121,49 +150,51 @@ int main(int argc, char **argv) {
         dropRate = 0;
     }
 
-    struct sockaddr_in myaddr;
-    struct sockaddr_in remaddr;
-    socklen_t addrlen = sizeof(remaddr);
-    int recvlen;
-    int sockFd;
-    unsigned char buf[2048];
+    connection = new GbnProtocol(corruptRate, dropRate);
 
-    if ((sockFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
-    	cout << "Cant create a socket" <<endl;
-    }
+    connection->network_set(port);
+
+    // struct sockaddr_in myaddr;
+    // struct sockaddr_in remaddr;
+    // socklen_t addrlen = sizeof(remaddr);
+    // int recvlen;
+    // int sockFd;
+    // unsigned char buf[2048];
 
 
-    memset((char *)&myaddr, 0, sizeof(myaddr));
-    myaddr.sin_family = AF_INET;
-    myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    myaddr.sin_port = htons(port);
-
-    if (bind(sockFd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0 ) {
-    	cout << "bind fail!" << endl;
-    }
-
-    // connection = new GbnProtocol(corruptRate, dropRate);
-    // if(!connection->listen(port)) {
-    // 	// Listen failed
-    // 	cout << "Server failed to listen.\n";
-    // 	delete connection;
-    // 	connection = NULL;
-    // 	exit(-1);
+    // if ((sockFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+    // 	cout << "Cant create a socket" <<endl;
     // }
+
+
+    // memset((char *)&myaddr, 0, sizeof(myaddr));
+    // myaddr.sin_family = AF_INET;
+    // myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    // myaddr.sin_port = htons(port);
+
+    // if (bind(sockFd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0 ) {
+    // 	cout << "bind fail!" << endl;
+    // }
+
+    // // connection = new GbnProtocol(corruptRate, dropRate);
+    // // if(!connection->listen(port)) {
+    // // 	// Listen failed
+    // // 	cout << "Server failed to listen.\n";
+    // // 	delete connection;
+    // // 	connection = NULL;
+    // // 	exit(-1);
+    // // }
     
-    cout << "Server is now listening on port " << 
-        port << endl;
+    // cout << "Server is now listening on port " << 
+    //     port << endl;
 	
 	while(true) {
 		// Wait for an actual connection
 		// if(!connection->accept()) continue;
-		
-	recvlen = recvfrom(sockFd, buf, 2048, 0, (struct sockaddr *)&remaddr, &addrlen);
-	if (recvlen > 0) {
-		buf[recvlen] = 0;
-		cout << "recvlen = " << recvlen << endl;
-		cout << buf << endl;
-	}
+		connection->receiveMsg();
+	
+
+
 
 		// string recvData = "";
 		// if (connection->receiveData(recvData)) {
