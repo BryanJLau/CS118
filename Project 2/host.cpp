@@ -41,9 +41,9 @@ void signalHandler(int signal) {
 }
 
 int main(int argc, char **argv) {
-    int port, corruptRate, dropRate;
+    int port, corruptRate, dropRate, windows;
     string fileName, optString;
-    port = corruptRate = dropRate = -1;
+    port = corruptRate = dropRate= windows = -1;
     fileName = "";
     
     char c, ch;
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    while ((c = getopt (argc, argv, "f:p:c:d:")) != -1) {
+    while ((c = getopt (argc, argv, "f:p:c:d:w:")) != -1) {
 	    switch (c) {
 		    case 'p':
 			    // Specify port number
@@ -83,6 +83,12 @@ int main(int argc, char **argv) {
 			    cout << "Setting drop rate to " << optString <<
 			        "\%" << endl;
 			    dropRate = atoi(optarg);
+			    break;
+		    case 'w':
+			    // Specify window count
+			    optString.assign(optarg);
+			    cout << "Setting window count to " << optString << endl;
+			    windows = atoi(optarg);
 			    break;
 		    case '?':
 			    ch = (char) optopt;
@@ -120,8 +126,13 @@ int main(int argc, char **argv) {
         cout << "No drop rate specified, using default rate: 0\%.\n";
         dropRate = 0;
     }
+    if(windows < 0) {
+        // Negative windows
+        cout << "No window count specified, using default : 4.\n";
+        windows = 4;
+    }
 
-    connection = new GbnProtocol(corruptRate, dropRate, false);
+    connection = new GbnProtocol(corruptRate, dropRate, false, windows);
     if(!connection->listen(port)) {
     	// Listen failed
     	cout << "Server failed to listen.\n";
