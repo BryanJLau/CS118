@@ -124,13 +124,13 @@ int main(int argc, char **argv) {
     
     // Time to set up the connection and start sending
     // We're going to use 0 for the receiver since the sender has this
-    connection = new GbnProtocol(0, 0, true);
+    connection = new GbnProtocol(0, 0, true, fileName);
     string fileData = "";
     if(!connection->connect(addr, port, false)) {
         cout << "Failed to connect.\n";
         exit(-1);
     } else {
-        connection->sendData(fileName);
+        //connection->sendData(fileName);
         connection->receiveData(fileData);
         connection->close();
     }

@@ -45,7 +45,7 @@ using namespace std;
 
 class GbnProtocol {
     public:
-        GbnProtocol(int cRate, int dRate, bool client);
+        GbnProtocol(int cRate, int dRate, bool client, string filename = "");
         
         bool connect(string const &address, int const port, bool ack);
         bool listen(int const port);
@@ -70,6 +70,7 @@ class GbnProtocol {
             char payload[MSS - sizeof(gbnHeader)];
         };
         
+        string fileName;
     private:
         bool isClient;
         bool listening;

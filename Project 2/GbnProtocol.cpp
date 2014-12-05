@@ -7,12 +7,13 @@
 #include <cerrno>
 #include <algorithm>
 
-GbnProtocol::GbnProtocol(int cRate, int dRate, bool client) {
+GbnProtocol::GbnProtocol(int cRate, int dRate, bool client, string filename) {
     corruptRate = cRate;
     dropRate = dRate;
     sockFd = -1;
     finned = listening = connected = false;
     isClient = client;
+    fileName = filename;
     
     memset(&remote, 0, sizeof(remote));
     memset(&local, 0, sizeof(remote));
@@ -69,9 +70,14 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
     }
     
     // Send SYN
-    packet outPacket = buildPacket();
+    packet outPacket = buildPacket(fileName, fileName.size());
     setSyn(outPacket);
     if(ack) setSynAck(outPacket);
+    else if(fileName != "") {
+	    outPacket.header.length = (uint16_t) fileName.size();
+        string fnn(outPacket.payload);
+        cout << "cool" << fnn << endl;
+	}
     cout << "Sending SYN packet.\n";
     
     if(!sendPacket(outPacket)) {
@@ -122,7 +128,6 @@ bool GbnProtocol::bind(const int port) {
         close();
         return false;
     } else {
-        cout << "Bound socket to fd: " << sockFd << endl;
         return true;
     }
 }
@@ -230,6 +235,8 @@ bool GbnProtocol::accept() {
 			cout << "Connecting to " << addr << ":" <<
 				inPacket.header.sourcePort << endl;
 			connected = connect(addr, inPacket.header.sourcePort, true);
+			string fn(inPacket.payload);
+            fileName = fn;
 		} else {
 			dropPacket(inPacket);
 			cout << "Received a non-SYN packet, dropping it.\n";

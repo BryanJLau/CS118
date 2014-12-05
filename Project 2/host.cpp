@@ -137,33 +137,28 @@ int main(int argc, char **argv) {
 		// Wait for an actual connection
 		if(!connection->accept()) continue;
 		
-		string recvData = "";
-		if (connection->receiveData(recvData) != -1) {
-			int file = open(recvData.c_str(), O_RDONLY);
+		int file = open(connection->fileName.c_str(), O_RDONLY);
 
-			if(file == -1) {
-			    cout << "Invalid file request: \"" << recvData << "\"\n";
-			    connection->close();
-			    continue; // We want to keep the server alive, not destroy it
-			} else {
-			    cout << "Preparing to send file...\n";
-				string data = "";
-				char buffer[MAX_BUFFER + 1]; // Need a \0 at the end
-				memset(buffer, 0, MAX_BUFFER);
+		if(file == -1) {
+		    cout << "Invalid file request: \"" << connection->fileName << "\"\n";
+		    connection->close();
+		    continue; // We want to keep the server alive, not destroy it
+		} else {
+		    cout << "Preparing to send file...\n";
+			string data = "";
+			char buffer[MAX_BUFFER + 1]; // Need a \0 at the end
+			memset(buffer, 0, MAX_BUFFER);
+	
+			// Read the contents of the file into a string
+			int length = 0;
 		
-				// Read the contents of the file into a string
-				int length = 0;
-			
-				while((length = read(file, buffer, MAX_BUFFER)) > 0) {
-					data.append(buffer, length);
-					memset(buffer, 0, MAX_BUFFER);
-				}
-				// Send the data and close
-				connection->sendData(data);
-				connection->close();
-				
-				recvData = "";
+			while((length = read(file, buffer, MAX_BUFFER)) > 0) {
+				data.append(buffer, length);
+				memset(buffer, 0, MAX_BUFFER);
 			}
+			// Send the data and close
+			connection->sendData(data);
+			connection->close();
 		}
 	}
 	
