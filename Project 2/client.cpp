@@ -109,7 +109,6 @@ int main(int argc, char **argv) {
         hostname = "localhost";
     }
     
-    /*
     int sockFd;
     if ((sockFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("cannot create socket");
@@ -126,10 +125,16 @@ int main(int argc, char **argv) {
 /* htonl converts a long integer (e.g. address) to a network representation */
 /* htons converts a short integer (e.g. port) to a network representation */
 
-    /*memset((char *)&rec_addr, 0, sizeof(rec_addr));
+    memset((char *)&rec_addr, 0, sizeof(rec_addr));
     rec_addr.sin_family = AF_INET;
-    rec_addr.sin_port = htons(10000);
-    inet_aton("127.0.0.1", &rec_addr.sin_addr);
+    rec_addr.sin_port = htons(port);
+    rec_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(sockFd, (struct sockaddr *)&rec_addr, sizeof(rec_addr)) < 0 ) {
+        cout << "Bind fail!" << endl;
+}
+    // rec_addr.sin_
+    // inet_aton("127.0.0.1", &rec_addr.sin_addr);
 
 
     // if (bind(sockFd, (struct sockaddr *)&rec_addr, sizeof(rec_addr)) < 0) {
@@ -138,10 +143,26 @@ int main(int argc, char **argv) {
     // }
 
     struct hostent *hp;
-    string message = "";
-    const void* c_message = message.c_str();
+    struct sockaddr_in servaddr;
 
+    memset((char*)&servaddr, 0 , sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(port);
 
+    string temp = "localhost";
+    const char *host = temp.c_str();
+    hp = gethostbyname(host);
+
+    if (!hp) {
+        cout << "no hp work!" <<endl;
+    }
+
+    memcpy((void *)&servaddr.sin_addr, hp->h_addr_list[0], hp->h_length);
+
+    string message = "no message";
+    const char* c_message = message.c_str();
+
+    cout << c_message << endl;
 
     cout << "Receiver open UDP connection on server's port " << port
         << endl;
@@ -149,11 +170,11 @@ int main(int argc, char **argv) {
     
     //memcpy((void *)&rec_addr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
-    if (sendto(sockFd, c_message, sizeof(c_message), 0, 
-        (struct sockaddr *)&rec_addr, sizeof(rec_addr)) < 0) {
+    if (sendto(sockFd, c_message, sizeof(c_message)+2, 0, 
+        (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
        perror("sendto failed");
         return 0;
-    }*/
+    }
     
     char addr[INET_ADDRSTRLEN];
     memset(&addr, 0, sizeof(addr));
