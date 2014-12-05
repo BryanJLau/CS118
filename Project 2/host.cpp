@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
         dropRate = 0;
     }
 
-    connection = new GbnProtocol(corruptRate, dropRate);
+    connection = new GbnProtocol(corruptRate, dropRate, false);
     if(!connection->listen(port)) {
     	// Listen failed
     	cout << "Server failed to listen.\n";
@@ -152,13 +152,12 @@ int main(int argc, char **argv) {
 				memset(buffer, 0, MAX_BUFFER);
 		
 				// Read the contents of the file into a string
-				int length = read(file, buffer, MAX_BUFFER);
+				int length = 0;
 			
-				while(length > 0) {
+				while((length = read(file, buffer, MAX_BUFFER)) > 0) {
 					data.append(buffer, length);
 					memset(buffer, 0, MAX_BUFFER);
 				}
-		
 				// Send the data and close
 				connection->sendData(data);
 				connection->close();

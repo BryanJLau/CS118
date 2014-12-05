@@ -17,7 +17,7 @@
 #define MSS (MTU - IP_HEADER - UDP_HEADER)
 
 #define TIMEOUT_SEC 0
-#define TIMEOUT_USEC 100000
+#define TIMEOUT_USEC 500000
 #define MAX_TRANSMITS 10
 #define MAX_HANDSHAKES 5
 #define MAX_DUP_ACK 3
@@ -45,7 +45,7 @@ using namespace std;
 
 class GbnProtocol {
     public:
-        GbnProtocol(int cRate, int dRate);
+        GbnProtocol(int cRate, int dRate, bool client);
         
         bool connect(string const &address, int const port, bool ack);
         bool listen(int const port);
@@ -71,6 +71,7 @@ class GbnProtocol {
         };
         
     private:
+        bool isClient;
         bool listening;
         bool connected;
         bool finned;

@@ -109,52 +109,6 @@ int main(int argc, char **argv) {
         hostname = "localhost";
     }
     
-    /*
-    int sockFd;
-    if ((sockFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("cannot create socket");
-        return 0;
-    }
-
-    struct sockaddr_in rec_addr;
-
-/* bind to an arbitrary return address */
-/* because this is the client side, we don't care about the address */
-/* since no application will initiate communication here - it will */
-/* just send responses */
-/* INADDR_ANY is the IP address and 0 is the socket */
-/* htonl converts a long integer (e.g. address) to a network representation */
-/* htons converts a short integer (e.g. port) to a network representation */
-
-    /*memset((char *)&rec_addr, 0, sizeof(rec_addr));
-    rec_addr.sin_family = AF_INET;
-    rec_addr.sin_port = htons(10000);
-    inet_aton("127.0.0.1", &rec_addr.sin_addr);
-
-
-    // if (bind(sockFd, (struct sockaddr *)&rec_addr, sizeof(rec_addr)) < 0) {
-    //     perror("bind failed");
-    //     return 0;
-    // }
-
-    struct hostent *hp;
-    string message = "";
-    const void* c_message = message.c_str();
-
-
-
-    cout << "Receiver open UDP connection on server's port " << port
-        << endl;
-
-    
-    //memcpy((void *)&rec_addr.sin_addr, hp->h_addr_list[0], hp->h_length);
-
-    if (sendto(sockFd, c_message, sizeof(c_message), 0, 
-        (struct sockaddr *)&rec_addr, sizeof(rec_addr)) < 0) {
-       perror("sendto failed");
-        return 0;
-    }*/
-    
     char addr[INET_ADDRSTRLEN];
     memset(&addr, 0, sizeof(addr));
     
@@ -170,7 +124,7 @@ int main(int argc, char **argv) {
     
     // Time to set up the connection and start sending
     // We're going to use 0 for the receiver since the sender has this
-    connection = new GbnProtocol(0, 0);
+    connection = new GbnProtocol(0, 0, true);
     string fileData = "";
     if(!connection->connect(addr, port, false)) {
         cout << "Failed to connect.\n";
