@@ -45,7 +45,8 @@ using namespace std;
 
 class GbnProtocol {
     public:
-        GbnProtocol(int cRate, int dRate, bool client, string filename = "");
+        GbnProtocol(int cRate, int dRate, bool client, int windows = 4,
+			string filename = "");
         
         bool connect(string const &address, int const port, bool ack);
         bool listen(int const port);
@@ -82,6 +83,7 @@ class GbnProtocol {
         
         int dropRate;
         int corruptRate;
+		int numWindows;
         
         time_t ctt;
 

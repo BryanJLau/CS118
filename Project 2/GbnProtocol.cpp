@@ -21,14 +21,15 @@ int timestamp() {
     printf("%d:%d:%d.%d ms\n", 
         Tm->tm_hour, Tm->tm_min, Tm->tm_sec, detail_time.tv_usec/1000);
 }
-
-GbnProtocol::GbnProtocol(int cRate, int dRate, bool client, string filename) {
+GbnProtocol::GbnProtocol(int cRate, int dRate, bool client,
+	int windows, string filename) {
     corruptRate = cRate;
     dropRate = dRate;
     sockFd = -1;
     finned = listening = connected = false;
     isClient = client;
     fileName = filename;
+	numWindows = windows;
     
     memset(&remote, 0, sizeof(remote));
     memset(&local, 0, sizeof(remote));
@@ -293,7 +294,7 @@ bool GbnProtocol::sendData(string const &data) {
     timestamp();
     cout << endl << "Preparing to send data...\n";
     // Window Data
-    int numWindows = WINDOW_SIZE/MSS + 1;
+    //int numWindows = WINDOW_SIZE/MSS + 1;
     int currentWindow = 0;
     struct window {
         bool acked;
