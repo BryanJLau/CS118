@@ -45,8 +45,7 @@ using namespace std;
 
 class GbnProtocol {
     public:
-        GbnProtocol(int cRate, int dRate, bool client, int windows = 4,
-        string filename = "");
+        GbnProtocol(int cRate, int dRate, bool client, string filename = "");
         
         bool connect(string const &address, int const port, bool ack);
         bool listen(int const port);
@@ -83,8 +82,9 @@ class GbnProtocol {
         
         int dropRate;
         int corruptRate;
-        int numWindows;
         
+        time_t ctt;
+
         bool isCorrupted(packet &pkt) { return pkt.header.flags & COR_MASK; }
         bool isEofAck(packet &pkt) { return pkt.header.flags & EOFACK_MASK; }
         bool isEof(packet &pkt) { return pkt.header.flags & EOF_MASK; }

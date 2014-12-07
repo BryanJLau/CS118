@@ -26,6 +26,8 @@ void help() {
     cout << "./receiver -h X - Sender's hostname X.\n";
     cout << "./receiver -p X - Set UDP connection on port X.\n";
     cout << "./reciever -f X - Recever request file X.\n";
+    cout << "./reciever -c X - \% of packets to pretend to corrupt (int).\n";
+    cout << "./reciever -d X - \% of packets to pretend to drop (int).\n";
     return;
 }
 
@@ -43,9 +45,9 @@ void signalHandler(int signal) {
 
 int main(int argc, char **argv) {
 
-    int port;
+    int port ,corruptRate, dropRate = -1;
     string fileName, optString, hostname;
-    port = -1;
+
     fileName = "";
     
     char c, ch;
@@ -59,7 +61,7 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    while ((c = getopt (argc, argv, "h:f:p:")) != -1) 
+    while ((c = getopt (argc, argv, "h:f:p:c:d:")) != -1) 
         switch (c) {
             case 'h':
                 optString.assign(optarg);
@@ -77,6 +79,20 @@ int main(int argc, char **argv) {
                 fileName.assign(optarg);
                 cout << "Request file is " << fileName << endl;
                 break;
+            case 'c':
+                // Specify corrupt rate
+                optString.assign(optarg);
+                cout << "Setting corruption rate to " << optString <<
+                    "\%" << endl;
+                corruptRate = atoi(optarg);
+                break;
+            case 'd':
+                // Specify drop rate
+                optString.assign(optarg);
+                cout << "Setting drop rate to " << optString <<
+                    "\%" << endl;
+                dropRate = atoi(optarg);
+                break;    
             case '?':
                 ch = (char) optopt;
                 cerr << "Option -" << ch << " requires an argument.\n";
@@ -87,6 +103,7 @@ int main(int argc, char **argv) {
                     cerr << "Unknown option character `\\x" << ch << "'.\n";
                     return 1;
                 break;
+
             default:
                 abort();
         }
@@ -108,6 +125,17 @@ int main(int argc, char **argv) {
         //default hostname = "localhost"
         hostname = "localhost";
     }
+
+    if(corruptRate < 0) {
+        // Negative corruptRate
+        cout << "No corrupt rate specified, using default rate: 0\%.\n";
+        corruptRate = 0;
+    }
+    if(dropRate < 0) {
+        // Negative dropRate
+        cout << "No drop rate specified, using default rate: 0\%.\n";
+        dropRate = 0;
+    }
     
     char addr[INET_ADDRSTRLEN];
     memset(&addr, 0, sizeof(addr));
@@ -124,7 +152,7 @@ int main(int argc, char **argv) {
     
     // Time to set up the connection and start sending
     // We're going to use 0 for the receiver since the sender has this
-    connection = new GbnProtocol(0, 0, true, 4, fileName);
+    connection = new GbnProtocol(0, 0, true, fileName);
     string fileData = "";
     if(!connection->connect(addr, port, false)) {
         cout << "Failed to connect.\n";

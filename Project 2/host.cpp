@@ -25,6 +25,7 @@ void help() {
     cout << "./server -c X - \% of packets to pretend to corrupt (int).\n";
     cout << "./server -d X - \% of packets to pretend to drop (int).\n";
     cout << "./server -w X - Number of windows to use (int).\n";
+
     return;
 }
 
@@ -41,9 +42,9 @@ void signalHandler(int signal) {
 }
 
 int main(int argc, char **argv) {
-    int port, corruptRate, dropRate, windows;
+    int port, corruptRate, dropRate;
     string fileName, optString;
-    port = corruptRate = dropRate= windows = -1;
+    port = corruptRate = dropRate = -1;
     fileName = "";
     
     char c, ch;
@@ -65,6 +66,7 @@ int main(int argc, char **argv) {
 			    cout << "Setting port to " + optString << endl;
 			    port = atoi(optarg);
 			    break;
+		    
 		    case 'c':
 			    // Specify corrupt rate
 			    optString.assign(optarg);
@@ -78,12 +80,6 @@ int main(int argc, char **argv) {
 			    cout << "Setting drop rate to " << optString <<
 			        "\%" << endl;
 			    dropRate = atoi(optarg);
-			    break;
-		    case 'w':
-			    // Specify window count
-			    optString.assign(optarg);
-			    cout << "Setting window count to " << optString << endl;
-			    windows = atoi(optarg);
 			    break;
 		    case '?':
 			    ch = (char) optopt;
@@ -105,6 +101,8 @@ int main(int argc, char **argv) {
         cout << "No port specified, using default port: 12345.\n";
         port = 12345;
     }
+    
+    
     if(corruptRate < 0) {
         // Negative corruptRate
         cout << "No corrupt rate specified, using default rate: 0\%.\n";
@@ -115,13 +113,8 @@ int main(int argc, char **argv) {
         cout << "No drop rate specified, using default rate: 0\%.\n";
         dropRate = 0;
     }
-    if(windows < 0) {
-        // Negative windows
-        cout << "No window count specified, using default : 4.\n";
-        windows = 4;
-    }
 
-    connection = new GbnProtocol(corruptRate, dropRate, false, windows);
+    connection = new GbnProtocol(corruptRate, dropRate, false);
     if(!connection->listen(port)) {
     	// Listen failed
     	cout << "Server failed to listen.\n";

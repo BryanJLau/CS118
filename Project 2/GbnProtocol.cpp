@@ -6,16 +6,29 @@
 #include <unistd.h>
 #include <cerrno>
 #include <algorithm>
+#include <ctime>
 
-GbnProtocol::GbnProtocol(int cRate, int dRate, bool client,
-    int windows, string filename) {
+
+int timestamp() {
+    time_t ltime;
+    struct tm *Tm;
+    ltime = time(NULL);
+    Tm = localtime(&ltime);
+
+    struct timeval detail_time;
+    gettimeofday(&detail_time,NULL);
+
+    printf("%d:%d:%d.%d ms\n", 
+        Tm->tm_hour, Tm->tm_min, Tm->tm_sec, detail_time.tv_usec/1000);
+}
+
+GbnProtocol::GbnProtocol(int cRate, int dRate, bool client, string filename) {
     corruptRate = cRate;
     dropRate = dRate;
     sockFd = -1;
     finned = listening = connected = false;
     isClient = client;
     fileName = filename;
-    numWindows = windows;
     
     memset(&remote, 0, sizeof(remote));
     memset(&local, 0, sizeof(remote));
@@ -38,6 +51,7 @@ int GbnProtocol::portNumber() {
 }
 
 bool GbnProtocol::connect(string const &address, int const port, bool ack) {
+    timestamp();
     cout << "Attempting connection to: " << address << ":" << port << endl;
     if(!listening) {
         if(!bind(port)) {
@@ -46,7 +60,7 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
         }
     }
     finned = false;
-    
+    timestamp();
     cout << "Setting remote info.\n";
     
     // Set remote info
@@ -57,7 +71,7 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
         close();
         return false;
     }
-    
+    timestamp();
     cout << "Setting socket timeout.\n";
     
     // Socket timeout
@@ -66,6 +80,7 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
     timeout.tv_usec = TIMEOUT_USEC;
     if(setsockopt(sockFd, SOL_SOCKET, SO_RCVTIMEO, (char*) &timeout,
         sizeof(timeout)) < 0) {
+        timestamp();
         cout << "Failed to set socket timeout.\n";
         close();
         return false;
@@ -78,14 +93,31 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
     else if(fileName != "") {
 	    outPacket.header.length = (uint16_t) fileName.size();
         string fnn(outPacket.payload);
-        cout << "cool" << fnn << endl;
+        // cout << "cool" << fnn << endl;
 	}
+    timestamp();
     cout << "Sending SYN packet.\n";
     
-    if(!sendPacket(outPacket)) {
-        cout << "Failed to send SYN packet.\n";
-        close();
-        return false;
+    if(random() % 100 > dropRate ) {
+        if (random() % 100 > corruptRate) {
+            if(!sendPacket(outPacket)) {
+                timestamp();
+                cout << "Failed to send SYN packet.\n";
+                close();
+                return false;
+            }
+        } else {
+            setCorrupted(outPacket);
+            cout << "corrupted" <<endl;
+            if(!sendPacket(outPacket)) {
+                timestamp();
+                cout << "Failed to send SYN packet.\n";
+                close();
+                return false;
+            }
+        }
+    } else {
+        dropPacket(outPacket);
     }
     
     packet inPacket;
@@ -98,6 +130,7 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
         // Attempt to receive the SYNACK
         if(receivePacket(inPacket) && isSynAck(inPacket) ||
             !isClient) {
+            timestamp();
             cout << "Connection successful to: " << address << ":" 
             	<< port << endl;
             return true;
@@ -113,6 +146,7 @@ bool GbnProtocol::connect(string const &address, int const port, bool ack) {
     
     // Time out
     close();
+    timestamp();
     cout << "Connection to: " << address << ":" << port <<
      	" timed out." << endl;
 }
@@ -138,6 +172,7 @@ void GbnProtocol::close(bool destroy) {
     if((!listening && sockFd != -1) || (listening && connected)) {
         char addr[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &remote.sin_addr.s_addr, addr, sizeof(addr));
+        timestamp();
         cout << "Closing connection to " << addr << ":" <<
             ntohs(remote.sin_port) << endl;
         
@@ -175,10 +210,14 @@ void GbnProtocol::close(bool destroy) {
                 if (errno == EWOULDBLOCK) timeouts++;
             } while (!finned && timeouts < MAX_HANDSHAKES);
         }
-        if(finned) cout << "Connection successfully closed.\n";
+        if(finned) {
+            timestamp();
+            cout << "Connection successfully closed.\n";
+        }
         else {
             // Timeout from above, close it anyway
             finned = true;
+            timestamp();
             cout << "FIN timeout, closing connection anyway.\n";
         }
     }
@@ -234,6 +273,7 @@ bool GbnProtocol::accept() {
 		if(isSyn(inPacket)) {
 			inet_ntop(AF_INET, &inAddr.sin_addr.s_addr, addr, sizeof(addr));
 			// SYNACK the SYN we just received
+            timestamp();
 			cout << "Connecting to " << addr << ":" <<
 				inPacket.header.sourcePort << endl;
 			connected = connect(addr, inPacket.header.sourcePort, true);
@@ -241,6 +281,7 @@ bool GbnProtocol::accept() {
             fileName = fn;
 		} else {
 			dropPacket(inPacket);
+            timestamp();
 			cout << "Received a non-SYN packet, dropping it.\n";
 		}
 	}
@@ -249,9 +290,10 @@ bool GbnProtocol::accept() {
 }
 
 bool GbnProtocol::sendData(string const &data) {
+    timestamp();
     cout << endl << "Preparing to send data...\n";
     // Window Data
-    //int nw = WINDOW_SIZE/MSS + 1;
+    int numWindows = WINDOW_SIZE/MSS + 1;
     int currentWindow = 0;
     struct window {
         bool acked;
@@ -273,6 +315,8 @@ bool GbnProtocol::sendData(string const &data) {
     uint16_t timeouts = 0;
     
     size_t length = data.length();
+    // timestamp();
+    timestamp();
     cout << "Transmitting file: " << data << " with length " << length << endl << endl;
     
     bool retransmit;
@@ -282,6 +326,7 @@ bool GbnProtocol::sendData(string const &data) {
     
         // Check if we're done
         if(totalAckedBytes >= length && length != 0) {
+            timestamp();
             cout << "Job complete.\n";
             return true;
         }
@@ -307,11 +352,13 @@ bool GbnProtocol::sendData(string const &data) {
                 
             // Check if this is the EOF packet
             if((totalUnackedBytes + totalAckedBytes) >= length) {
+                timestamp();
                 cout << "Reached EOF, setting EOF flag.\n";
                 setEof(outPacket);
             }
             
             // Transmit packet
+            timestamp();
             cout << "Transmitting packet with sequence number " <<
                 outPacket.header.sequenceNumber << " in window " << 
                 currentWindow << endl;
@@ -339,7 +386,7 @@ bool GbnProtocol::sendData(string const &data) {
                 totalUnackedBytes = 0;
                 (--currentWindow) %= numWindows;
                 for(int j = 0; j < numWindows; j++) windows[j].acked = true;
-                
+                timestamp();
                 cout << "Packet with sequence number " <<
                     windows[i].sequenceNumber <<
                     " timed out, resending all in current window.\n";
@@ -353,17 +400,21 @@ bool GbnProtocol::sendData(string const &data) {
             packet inPacket;
             if(receivePacket(inPacket)) {
                 if(isFin(inPacket)) {
+                    timestamp();
                     cout << "Received FIN, closing.\n";
                     close();
                     return false;
                 } else if(!isAck(inPacket)) {
+                    timestamp();
                     cout << "Expected ACK, dropping packet.\n";
                     dropPacket(inPacket);
                 } else {
                     // We're good to go
                     size_t ack = inPacket.header.ackNumber;
+                    timestamp();
                     cout << "Received ACK " << ack << endl;
                     if(ack > (totalUnackedBytes + totalAckedBytes)) {
+                        timestamp();
                         cout << "Received larger ACK, dropping packet.\n";
                         dropPacket(inPacket);
                         continue;
@@ -371,6 +422,7 @@ bool GbnProtocol::sendData(string const &data) {
                     
                     // Check for duplicate ACK
                     if(ack < lastAck) {
+                        timestamp();
                         cout << "Dropping duplicate ACK.\n";
                         dropPacket(inPacket);
                     } else {
@@ -378,6 +430,7 @@ bool GbnProtocol::sendData(string const &data) {
                             if(!windows[i].acked &&
                                 windows[i].sequenceNumber <= ack) {
                                 windows[i].acked = true;
+                                timestamp();
                                 cout << "Received correct ACK " << ack << endl;
                             }
                         }
@@ -390,11 +443,13 @@ bool GbnProtocol::sendData(string const &data) {
             } else {
                 // We didn't receive a packet in time
                 timeouts++;
+                timestamp();
                 cout << "Timed out, current attempts: " << timeouts <<
-                    "/" << MAX_TRANSMITS << endl;
+                    "/" << MAX_TRANSMITS  <<endl;
                 
                 // Check to see if we reached the max
                 if(timeouts >= MAX_TRANSMITS) {
+                    timestamp();
                     cout << "Reached maximum timeouts.\n";
                     return false;
                 }
@@ -415,6 +470,7 @@ bool GbnProtocol::sendPacket(packet const &pkt) {
 }
 
 bool GbnProtocol::receiveData(string &data) {
+    timestamp();
     cout << endl << "Preparing to receive data...\n";
     packet inPacket, outPacket;
     uint16_t timeouts = 0;
@@ -425,6 +481,7 @@ bool GbnProtocol::receiveData(string &data) {
             // Got a packet!
             if(inPacket.header.sequenceNumber <= receivedBytes) {
                 // This was a duplicate packet
+                timestamp();
                 cout << "Received duplicate packet, sending correct ACK.\n";
                 outPacket = buildPacket();
                 outPacket.header.ackNumber = inPacket.header.sequenceNumber;
@@ -435,6 +492,7 @@ bool GbnProtocol::receiveData(string &data) {
             } else if ((int) (inPacket.header.sequenceNumber - MSS) >
                 (int) receivedBytes) {
                 // Unexpected sequence number
+                timestamp();
                 cout << "Out of range sequence number.\n";
                 dropPacket(inPacket);
                 continue;
@@ -452,10 +510,12 @@ bool GbnProtocol::receiveData(string &data) {
                 outPacket = buildPacket();
                 outPacket.header.ackNumber = inPacket.header.sequenceNumber;
                 setAck(outPacket);
+                timestamp();
                 cout << "Sending ACK " << outPacket.header.ackNumber << endl;
                 
                 // Check to see if it's a FIN, close since it's unexpected
                 if(isFin(inPacket)) {
+                    timestamp();
                     cout << "Received FIN, closing.\n";
                     setFinAck(outPacket);
                     sendPacket(outPacket);
@@ -463,6 +523,7 @@ bool GbnProtocol::receiveData(string &data) {
                     return true;
                 }
                 if(isEof(inPacket)) {
+                    timestamp();
                     cout << "Received EOF, job completed.\n";
                     setEofAck(outPacket);
                     sendPacket(outPacket);
@@ -472,11 +533,13 @@ bool GbnProtocol::receiveData(string &data) {
         } else {
             // We didn't receive a packet in time
             timeouts++;
+            timestamp();
             cout << "Timed out, current attempts: " << timeouts <<
-                "/" << MAX_TRANSMITS << endl;
+                    "/" << MAX_TRANSMITS  <<endl;
             
             // Check to see if we reached the max
             if(timeouts >= MAX_TRANSMITS) {
+                timestamp();
                 cout << "Reached maximum timeouts.\n";
                 return false;
             }
@@ -507,8 +570,9 @@ bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddrIn) {
         // Socket timeout
         if(headerLength == -1 && errno == EWOULDBLOCK) {
             dropPacket(pkt);
-            cout << "Socket timeout while waiting for packet.\n";
-            return false;
+            timestamp();
+            cout << "Socket timeout while waiting for packet " << endl;
+            return false;   
         }
         
         // The whole header might not be here yet
@@ -522,7 +586,8 @@ bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddrIn) {
             sizeof(pkt.header));
         packetLength = recvfrom(sockFd, &pkt, packetSize, 0, NULL, NULL);
         if(errno == EWOULDBLOCK) {
-            cout << "Socket timeout while receiving packet.\n";
+            timestamp();
+            cout << "Socket timeout while waiting for packet" << endl;
             return false;
         }
         if(packetLength == -1) {
@@ -542,6 +607,10 @@ bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddrIn) {
             dropPacket(pkt);
             return false;
         }
+        if(random() % 100 < corruptRate) {
+            cout << "Simulating corrupt packet \n";
+            setCorrupted(pkt);
+        }
         if(random() % 100 < dropRate) {
             cout << "Simulating dropped packet.\n";
             dropPacket(pkt);
@@ -555,9 +624,11 @@ bool GbnProtocol::receivePacket(packet &pkt, sockaddr_in *sockaddrIn) {
     packet outPacket = buildPacket();
     if(isSyn(pkt)) {
         setSynAck(outPacket);
+        timestamp();
         cout << "Received SYN, SYNACK'ing now.\n";
         sendPacket(outPacket);
     } else if(isFin(pkt)) {
+        timestamp();
         // We're almost done with this connection!
         cout << "Received FIN, FINACK'ing now.\n";
         finned = true;
